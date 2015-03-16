@@ -96,17 +96,17 @@ bool DS1820::begin(void) {
             present = 0;
 #if DEBUG
             serial.printf("Device doesn't belong to the DS1820 family\r\n");
-            return false;
 #endif            
+            return false;
         }
         return true;
     }
-#if DEBUG    
     else {
+#if DEBUG    
         serial.printf("Invalid CRC!\r\n");
+#endif    
         return false;
     }
-#endif    
 }
 
 /**
