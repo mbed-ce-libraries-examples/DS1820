@@ -1,6 +1,6 @@
 #include "DS1820.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 #if DEBUG
 extern Serial serial;
