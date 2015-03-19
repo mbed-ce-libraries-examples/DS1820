@@ -1,3 +1,28 @@
+/*
+ * Dallas' DS1820 family temperature sensor.
+ * This library depends on the OneWire library (Dallas' 1-Wire bus protocol implementation)
+ * which is available at <http://developer.mbed.org/users/hudakz/code/OneWire/>
+ *
+ * Example of use:
+ * 
+ * #include "DS1820.h"
+ * 
+ * int main() {
+ *     DS1820  ds1820(PA_9);
+ *
+ *     if(ds1820.begin()) {
+ *        ds1820.startConversion();
+ *        wait(1.0);
+ *        while(1) {
+ *            serial.printf("temp = %3.1f\r\n", ds1820.read());
+ *            ds1820.startConversion();
+ *            wait(1.0);
+ *        }
+ *    } else
+ *        serial.printf("No DS1820 sensor found!\r\n");
+ * }
+ */
+ 
 #include "DS1820.h"
 
 #define DEBUG 0
@@ -9,7 +34,7 @@ extern Serial serial;
 /**
  * @brief   Constructs a generic DS1820 sensor
  * @note    begin() must be called to detect and initialize the actual model
- * @param   Name of data pin
+ * @param   pin: Name of data pin
  * @retval
  */
 DS1820::DS1820(PinName pin) :
@@ -21,8 +46,8 @@ DS1820::DS1820(PinName pin) :
 /**
  * @brief   Constructs a specific model
  * @note    No need to call begin() to detect and initialize the model
- * @param   One character model name: 'S', 's', 'B' or 'b'
- *          Name of data pin
+ * @param   model:  One character model name: 'S', 's', 'B' or 'b'
+ *          pin:    Name of data pin
  * @retval
  */
 DS1820::DS1820(char model, PinName pin) :
@@ -118,10 +143,8 @@ bool DS1820::begin(void) {
 void DS1820::startConversion(void) {
     if(present) {
         oneWire.reset();
-
-        //oneWire.select(addr);
         oneWire.skip();
-        oneWire.write(0x44);    //start conversion
+        oneWire.write(0x44);    //start temperature conversion
     }
 }
 
@@ -142,6 +165,8 @@ float DS1820::read(void) {
         // Convert the raw bytes to a 16bit signed fixed point value :
         // 1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
         // ie. the LSB of the 16bit binary number represents 1/256th of a unit).
+        // Finally the 16bit signed fixed point value is converted 
+        // to floating point value by calling the toFloat(value) function.
 
         uint16_t*   p_word = reinterpret_cast < uint16_t * > (&data[0]);
 
@@ -182,7 +207,7 @@ float DS1820::read(void) {
 }
 
 /**
- * @brief   Converts a 16bit signed fixed point value to float
+ * @brief   Converts a 16bit signed fixed point value to floating point value
  * @note    The 16bit unsigned integer represnts actually
  *          a 16bit signed fixed point value:
  *          1 sign bit, 7 integer bits, 8 fractional bits
@@ -192,7 +217,6 @@ float DS1820::read(void) {
  * @retval  Floating point temperature value
  */
 float DS1820::toFloat(uint16_t word) {
-    //word = word << 4;
     if(word & 0x8000)
         return (-float(uint16_t(~word + 1)) / 256.0f);
     else
