@@ -15,6 +15,7 @@ public:
     DS1820(PinName pin);
     DS1820(char model, PinName pin);
     bool   begin(void);
+    void   setResolution(uint8_t res);
     void   startConversion(void);
     float  read(void);
 

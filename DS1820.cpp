@@ -135,6 +135,39 @@ bool DS1820::begin(void) {
 }
 
 /**
+ * @brief   Sets temperature-to-digital conversion resolution
+ * @note    The configuration register allows the user to set the resolution
+ *          of the temperature-to-digital conversion to 9, 10, 11, or 12 bits
+ *          Defaults to 12bit resolution for DS18B20.
+ *          DS18S20 allows only 9bit resolution.
+ * @param   res:    Resolution of the temperature-to-digital conversion in bits
+ * @retval
+ */
+void DS1820::setResolution(uint8_t res) {
+    // keep resolution within limits
+    if(res > 12)
+        res = 12;
+    if(res < 9)
+        res = 9;      
+    if(type_s)
+        res = 9;
+       
+    oneWire.reset();
+    oneWire.skip();
+    oneWire.write(0xBE);            // to read Scratchpad
+    for(uint8_t i = 0; i < 9; i++)  // read Scratchpad bytes
+        data[i] = oneWire.read();
+
+    data[4] |= (res - 9) << 5;      // update configuration byte (set resolution)  
+    oneWire.reset();
+    oneWire.skip();
+    oneWire.write(0x4E);            // to write into Scratchpad
+    for(uint8_t i = 2; i < 5; i++)  // write three bytes (2nd, 3rd, 4th) into Scratchpad
+        oneWire.write(data[i]);
+}
+
+
+/**
  * @brief   Starts temperature conversion
  * @note    The time to complete the converion depends on the selected resolusion
  * @param
@@ -162,43 +195,46 @@ float DS1820::read(void) {
         for(uint8_t i = 0; i < 9; i++)
             data[i] = oneWire.read();
 
-        // Convert the raw bytes to a 16bit signed fixed point value :
-        // 1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
-        // ie. the LSB of the 16bit binary number represents 1/256th of a unit).
-        // Finally the 16bit signed fixed point value is converted 
-        // to floating point value by calling the toFloat(value) function.
-
+        // Convert the raw bytes to a 16bit unsigned value
         uint16_t*   p_word = reinterpret_cast < uint16_t * > (&data[0]);
 
 #if DEBUG
         serial.printf("raw = %#x\r\n", *p_word);
 #endif            
 
-
         if(type_s) {
-            *p_word = *p_word << 3;     // default 9 bit resolution
+            *p_word = *p_word << 3;         // 9 bit resolution,  max conversion time = 750ms
             if(data[7] == 0x10) {
 
                 // "count remain" gives full 12 bit resolution
                 *p_word = (*p_word & 0xFFF0) + 12 - data[6];
             }
 
+            // Convert the raw bytes to a 16bit signed fixed point value :
+            // 1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
+            // and the LSB of the 16bit binary number represents 1/256th of a unit).
             *p_word = *p_word << 4;
+            // Convert to floating point value
             return(toFloat(*p_word));
         }
         else {
-            uint8_t cfg = (data[4] & 0x60);
-            // at lower res, the low bits are undefined, so let's zero them
-
+            uint8_t cfg = (data[4] & 0x60); // default 12bit resolution, max conversion time = 750ms
+            
+            // at lower resolution, the low bits are undefined, so let's clear them
             if(cfg == 0x00)
-                *p_word = *p_word &~7;  // 9 bit resolution, 93.75 ms
+                *p_word = *p_word &~7;      //  9bit resolution, max conversion time = 93.75ms
             else
             if(cfg == 0x20)
-                *p_word = *p_word &~3;  // 10 bit res, 187.5 ms
+                *p_word = *p_word &~3;      // 10bit resolution, max conversion time = 187.5ms
             else
             if(cfg == 0x40)
-                *p_word = *p_word &~1;  // 11 bit res, 375 ms
-            *p_word = *p_word << 4;     // default is 12 bit resolution
+                *p_word = *p_word &~1;      // 11bit resolution, max conversion time = 375ms
+                                               
+            // Convert the raw bytes to a 16bit signed fixed point value :
+            // 1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
+            // and the LSB of the 16bit binary number represents 1/256th of a unit).
+            *p_word = *p_word << 4;
+            // Convert to floating point value
             return(toFloat(*p_word));
         }
     }
@@ -210,11 +246,10 @@ float DS1820::read(void) {
  * @brief   Converts a 16bit signed fixed point value to floating point value
  * @note    The 16bit unsigned integer represnts actually
  *          a 16bit signed fixed point value:
- *          1 sign bit, 7 integer bits, 8 fractional bits
- *          (two’s compliment ie. the LSB of the 16bit binary number 
- *           represents 1/256th of a unit).       
+ *          1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
+ *          and the LSB of the 16bit binary number represents 1/256th of a unit).       
  * @param   16bit unsigned integer
- * @retval  Floating point temperature value
+ * @retval  Floating point value
  */
 float DS1820::toFloat(uint16_t word) {
     if(word & 0x8000)
