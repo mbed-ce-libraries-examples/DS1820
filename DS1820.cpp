@@ -1,26 +1,33 @@
 /*
  * Dallas' DS1820 family temperature sensor.
  * This library depends on the OneWire library (Dallas' 1-Wire bus protocol implementation)
- * which is available at <http://developer.mbed.org/users/hudakz/code/OneWire/>
+ * available at <http://developer.mbed.org/users/hudakz/code/OneWire/>
  *
  * Example of use:
  * 
  * #include "DS1820.h"
+ *
+ * Serial serial(USBTX, USBRX);
  * 
  * int main() {
- *     DS1820  ds1820(PA_9);
+ *     DS1820  ds1820(PA_9);    // substitute PA_9 with actual mbed pin name connected to the DS1820 data pin
  *
  *     if(ds1820.begin()) {
  *        ds1820.startConversion();
  *        wait(1.0);
  *        while(1) {
- *            serial.printf("temp = %3.1f\r\n", ds1820.read());
- *            ds1820.startConversion();
- *            wait(1.0);
+ *            serial.printf("temp = %3.1f\r\n", ds1820.read());     // read temperature
+ *            ds1820.startConversion();     // start temperature conversion
+ *            wait(1.0);                    // let DS1820 complete the temperature conversion
  *        }
  *    } else
  *        serial.printf("No DS1820 sensor found!\r\n");
  * }
+ *
+ * 
+ * Note: Don't forget to connect a 4.7k Ohm resistor 
+ *       between the DS1820's data pin and the +3.3V pin
+ *
  */
  
 #include "DS1820.h"
@@ -135,12 +142,12 @@ bool DS1820::begin(void) {
 }
 
 /**
- * @brief   Sets temperature-to-digital conversion resolution
+ * @brief   Sets temperature-to-digital conversion resolution.
  * @note    The configuration register allows the user to set the resolution
- *          of the temperature-to-digital conversion to 9, 10, 11, or 12 bits
- *          Defaults to 12bit resolution for DS18B20.
- *          DS18S20 allows only 9bit resolution.
- * @param   res:    Resolution of the temperature-to-digital conversion in bits
+ *          of the temperature-to-digital conversion to 9, 10, 11, or 12 bits.
+ *          Defaults to 12-bit resolution for DS18B20.
+ *          DS18S20 allows only 9-bit resolution.
+ * @param   res:    Resolution of the temperature-to-digital conversion in bits.
  * @retval
  */
 void DS1820::setResolution(uint8_t res) {
@@ -156,7 +163,7 @@ void DS1820::setResolution(uint8_t res) {
     oneWire.skip();
     oneWire.write(0xBE);            // to read Scratchpad
     for(uint8_t i = 0; i < 9; i++)  // read Scratchpad bytes
-        data[i] = oneWire.read();
+        data[i] = oneWire.read();   
 
     data[4] |= (res - 9) << 5;      // update configuration byte (set resolution)  
     oneWire.reset();
@@ -169,7 +176,11 @@ void DS1820::setResolution(uint8_t res) {
 
 /**
  * @brief   Starts temperature conversion
- * @note    The time to complete the converion depends on the selected resolusion
+ * @note    The time to complete the converion depends on the selected resolution:
+ *           9-bit resolution -> max conversion time = 93.75ms
+ *          10-bit resolution -> max conversion time = 187.5ms
+ *          11-bit resolution -> max conversion time = 375ms
+ *          12-bit resolution -> max conversion time = 750ms
  * @param
  * @retval
  */
@@ -182,7 +193,7 @@ void DS1820::startConversion(void) {
 }
 
 /**
- * @brief   Reads temperature from the chip's scratchpad
+ * @brief   Reads temperature from the chip's Scratchpad
  * @note
  * @param
  * @retval  Floating point temperature value
@@ -192,10 +203,10 @@ float DS1820::read(void) {
         oneWire.reset();
         oneWire.skip();
         oneWire.write(0xBE);            // to read Scratchpad
-        for(uint8_t i = 0; i < 9; i++)
-            data[i] = oneWire.read();
+        for(uint8_t i = 0; i < 9; i++)  // read Scratchpad bytes
+            data[i] = oneWire.read();   
 
-        // Convert the raw bytes to a 16bit unsigned value
+        // Convert the raw bytes to a 16-bit unsigned value
         uint16_t*   p_word = reinterpret_cast < uint16_t * > (&data[0]);
 
 #if DEBUG
@@ -203,52 +214,47 @@ float DS1820::read(void) {
 #endif            
 
         if(type_s) {
-            *p_word = *p_word << 3;         // 9 bit resolution,  max conversion time = 750ms
+            *p_word = *p_word << 3;         // 9-bit resolution
             if(data[7] == 0x10) {
 
-                // "count remain" gives full 12 bit resolution
+                // "count remain" gives full 12-bit resolution
                 *p_word = (*p_word & 0xFFF0) + 12 - data[6];
             }
-
-            // Convert the raw bytes to a 16bit signed fixed point value :
-            // 1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
-            // and the LSB of the 16bit binary number represents 1/256th of a unit).
-            *p_word = *p_word << 4;
-            // Convert to floating point value
-            return(toFloat(*p_word));
         }
         else {
-            uint8_t cfg = (data[4] & 0x60); // default 12bit resolution, max conversion time = 750ms
+            uint8_t cfg = (data[4] & 0x60); // default 12-bit resolution
             
             // at lower resolution, the low bits are undefined, so let's clear them
             if(cfg == 0x00)
-                *p_word = *p_word &~7;      //  9bit resolution, max conversion time = 93.75ms
+                *p_word = *p_word &~7;      //  9-bit resolution
             else
             if(cfg == 0x20)
-                *p_word = *p_word &~3;      // 10bit resolution, max conversion time = 187.5ms
+                *p_word = *p_word &~3;      // 10-bit resolution
             else
             if(cfg == 0x40)
-                *p_word = *p_word &~1;      // 11bit resolution, max conversion time = 375ms
+                *p_word = *p_word &~1;      // 11-bit resolution
                                                
-            // Convert the raw bytes to a 16bit signed fixed point value :
-            // 1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
-            // and the LSB of the 16bit binary number represents 1/256th of a unit).
-            *p_word = *p_word << 4;
-            // Convert to floating point value
-            return(toFloat(*p_word));
         }
+
+        // Convert the raw bytes to a 16-bit signed fixed point value :
+        // 1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
+        // and the LSB of the 16-bit binary number represents 1/256th of a unit).
+        *p_word = *p_word << 4;
+        
+        // Convert to floating point value
+        return(toFloat(*p_word));
     }
     else
         return 0;
 }
 
 /**
- * @brief   Converts a 16bit signed fixed point value to floating point value
- * @note    The 16bit unsigned integer represnts actually
- *          a 16bit signed fixed point value:
+ * @brief   Converts a 16-bit signed fixed point value to floating point value
+ * @note    The 16-bit unsigned integer represnts actually
+ *          a 16-bit signed fixed point value:
  *          1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
- *          and the LSB of the 16bit binary number represents 1/256th of a unit).       
- * @param   16bit unsigned integer
+ *          and the LSB of the 16-bit binary number represents 1/256th of a unit).       
+ * @param   16-bit unsigned integer
  * @retval  Floating point value
  */
 float DS1820::toFloat(uint16_t word) {
