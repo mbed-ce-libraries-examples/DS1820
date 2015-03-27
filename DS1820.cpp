@@ -46,8 +46,8 @@ extern Serial serial;
  */
 DS1820::DS1820(PinName pin) :
     oneWire(pin) {
-    present = 0;
-    type_s = 0;
+    present = false;
+    model_s = false;
 }
 
 /**
@@ -60,15 +60,15 @@ DS1820::DS1820(PinName pin) :
 DS1820::DS1820(char model, PinName pin) :
     oneWire(pin) {
     if((model == 'S') or (model == 's')) {
-        present = 1;
-        type_s = 1;
+        present = true;
+        model_s = true;
     }
     else if((model == 'B') or (model == 'b')) {
-        present = 1;
-        type_s = 0;
+        present = true;
+        model_s = false;
     }
     else
-        present = 0;
+        present = false;
 }
 
 /**
@@ -99,33 +99,33 @@ bool DS1820::begin(void) {
 #endif
 
     if(OneWire::crc8(addr, 7) == addr[7]) {
-        present = 1;
+        present = true;
 
         // the first ROM byte indicates which chip
         switch(addr[0]) {
         case 0x10:
-            type_s = 1;
+            model_s = true;
 #if DEBUG
             serial.printf("DS18S20 or old DS1820\r\n");
 #endif            
             break;
 
         case 0x28:
-            type_s = 0;
+            model_s = false;
 #if DEBUG
             serial.printf("DS18B20\r\n");
 #endif            
             break;
 
         case 0x22:
-            type_s = 0;
+            model_s = false;
 #if DEBUG
             serial.printf("DS1822\r\n");
 #endif            
             break;
 
         default:
-            present = 0;
+            present = false;
 #if DEBUG
             serial.printf("Device doesn't belong to the DS1820 family\r\n");
 #endif            
@@ -139,6 +139,19 @@ bool DS1820::begin(void) {
 #endif    
         return false;
     }
+}
+
+/**
+ * @brief   Informs about presence of a DS1820 sensor.
+ * @note    begin() shall be called before using this function
+ *          if a generic DS1820 instance was created by the user. 
+ *          No need to call begin() for a specific DS1820 instance.
+ * @param
+ * @retval  true:   when a DS1820 sensor is present
+ *          false:  otherwise
+ */
+bool DS1820::isPresent(void) {
+    return present;
 }
 
 /**
@@ -156,7 +169,7 @@ void DS1820::setResolution(uint8_t res) {
         res = 12;
     if(res < 9)
         res = 9;      
-    if(type_s)
+    if(model_s)
         res = 9;
        
     oneWire.reset();
@@ -172,7 +185,6 @@ void DS1820::setResolution(uint8_t res) {
     for(uint8_t i = 2; i < 5; i++)  // write three bytes (2nd, 3rd, 4th) into Scratchpad
         oneWire.write(data[i]);
 }
-
 
 /**
  * @brief   Starts temperature conversion
@@ -213,7 +225,7 @@ float DS1820::read(void) {
         serial.printf("raw = %#x\r\n", *p_word);
 #endif            
 
-        if(type_s) {
+        if(model_s) {
             *p_word = *p_word << 3;         // 9-bit resolution
             if(data[7] == 0x10) {
 
@@ -263,4 +275,5 @@ float DS1820::toFloat(uint16_t word) {
     else
         return (float(word) / 256.0f);
 }
+
 
