@@ -261,6 +261,78 @@ float DS1820::read(void) {
 }
 
 /**
+ * @brief   Reads temperature from chip's scratchpad.
+ * @note    Verifies data integrity by calculating cyclic redundancy check (CRC).
+ *          If the calculated CRC dosn't match the one stored in chip's scratchpad register
+ *          the temperature variable is not updated and CRC error code is returned.
+ * @param   temp: The temperature variable to be updated by this routine.
+ *                (It's passed as reference to floating point.)
+ * @retval  error code:
+ *              0 - no errors ('temp' contains the temperature measured)
+ *              1 - sensor not present ('temp' is not updated)
+ *              2 - CRC error ('temp' is not updated)
+ */
+uint8_t DS1820::read(float& temp) {
+    if(present) {
+        oneWire.reset();
+        oneWire.skip();
+        oneWire.write(0xBE);            // to read Scratchpad
+        for(uint8_t i = 0; i < 9; i++)  // reading scratchpad registers
+            data[i] = oneWire.read();
+
+        if(oneWire.crc8(data, 8) != data[8])    // if calculated CRC does not match the stored one
+            return 2;                           // return with CRC error
+
+        // Convert the raw bytes to a 16bit unsigned value
+        uint16_t*   p_word = reinterpret_cast < uint16_t * > (&data[0]);
+
+#if DEBUG
+        serial.printf("raw = %#x\r\n", *p_word);
+#endif
+
+        if(model_s) {
+            *p_word = *p_word << 3;         // 9 bit resolution,  max conversion time = 750ms
+            if(data[7] == 0x10) {
+
+                // "count remain" gives full 12 bit resolution
+                *p_word = (*p_word & 0xFFF0) + 12 - data[6];
+            }
+
+            // Convert the raw bytes to a 16bit signed fixed point value :
+            // 1 sign bit, 7 integer bits, 8 fractional bits (two's compliment
+            // and the LSB of the 16bit binary number represents 1/256th of a unit).
+            *p_word = *p_word << 4;
+            // Convert to floating point value
+            temp = toFloat(*p_word);
+            return 0;   // return with no errors
+        }
+        else {
+            uint8_t cfg = (data[4] & 0x60); // default 12bit resolution, max conversion time = 750ms
+
+            // at lower resolution, the low bits are undefined, so let's clear them
+            if(cfg == 0x00)
+                *p_word = *p_word &~7;      //  9bit resolution, max conversion time = 93.75ms
+            else
+            if(cfg == 0x20)
+                *p_word = *p_word &~3;      // 10bit resolution, max conversion time = 187.5ms
+            else
+            if(cfg == 0x40)
+                *p_word = *p_word &~1;      // 11bit resolution, max conversion time = 375ms
+
+            // Convert the raw bytes to a 16bit signed fixed point value :
+            // 1 sign bit, 7 integer bits, 8 fractional bits (two's compliment
+            // and the LSB of the 16bit binary number represents 1/256th of a unit).
+            *p_word = *p_word << 4;
+            // Convert to floating point value
+            temp = toFloat(*p_word);
+            return 0;   // return with no errors
+        }
+    }
+    else
+        return 1;   // error, sensor is not present
+}
+
+/**
  * @brief   Converts a 16-bit signed fixed point value to floating point value
  * @note    The 16-bit unsigned integer represnts actually
  *          a 16-bit signed fixed point value:

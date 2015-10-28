@@ -20,5 +20,6 @@ public:
     void   setResolution(uint8_t res);
     void   startConversion(void);
     float  read(void);
+    uint8_t read(float& temp);
 };
 #endif /* DS1820_H_ */
