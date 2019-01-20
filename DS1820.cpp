@@ -320,7 +320,7 @@ uint8_t DS1820::read(float& temp) {
                 *p_word = *p_word &~1;      // 11bit resolution, max conversion time = 375ms
 
             // Convert the raw bytes to a 16bit signed fixed point value :
-            // 1 sign bit, 7 integer bits, 8 fractional bits (two's compliment
+            // 1 sign bit, 7 integer bits, 8 fractional bits (two's complement
             // and the LSB of the 16bit binary number represents 1/256th of a unit).
             *p_word = *p_word << 4;
             // Convert to floating point value
@@ -336,7 +336,7 @@ uint8_t DS1820::read(float& temp) {
  * @brief   Converts a 16-bit signed fixed point value to floating point value
  * @note    The 16-bit unsigned integer represnts actually
  *          a 16-bit signed fixed point value:
- *          1 sign bit, 7 integer bits, 8 fractional bits (two’s compliment
+ *          1 sign bit, 7 integer bits, 8 fractional bits (two’s complement
  *          and the LSB of the 16-bit binary number represents 1/256th of a unit).       
  * @param   16-bit unsigned integer
  * @retval  Floating point value

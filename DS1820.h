@@ -3,6 +3,39 @@
 
     #include <OneWire.h>
 
+/**
+ * Dallas' DS1820 family temperature sensor.
+ * This library depends on the OneWire library (Dallas' 1-Wire bus protocol implementation)
+ * available at <http://developer.mbed.org/users/hudakz/code/OneWire/>
+ *
+ * Example of use:
+ * 
+ * @code
+ * #include "DS1820.h"
+ *
+ * Serial serial(USBTX, USBRX);
+ * 
+ * int main() {
+ *     DS1820  ds1820(PA_9);    // substitute PA_9 with actual mbed pin name connected to the DS1820 data pin
+ *
+ *     if(ds1820.begin()) {
+ *        ds1820.startConversion();
+ *        wait(1.0);
+ *        while(1) {
+ *            serial.printf("temp = %3.1f\r\n", ds1820.read());     // read temperature
+ *            ds1820.startConversion();     // start temperature conversion
+ *            wait(1.0);                    // let DS1820 complete the temperature conversion
+ *        }
+ *    } else
+ *        serial.printf("No DS1820 sensor found!\r\n");
+ * }
+ *
+ * @endcode
+ * 
+ * Note: Don't forget to connect a 4.7k Ohm resistor 
+ *       between the DS1820's data pin and the +3.3V pin
+ *
+ */
 class   DS1820
 {
     OneWire oneWire;
