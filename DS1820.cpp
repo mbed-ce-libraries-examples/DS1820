@@ -16,12 +16,12 @@
  *        ds1820.startConversion();
  *        wait(1.0);
  *        while(1) {
- *            serial.printf("temp = %3.1f\r\n", ds1820.read());     // read temperature
+ *            printf("temp = %3.1f\r\n", ds1820.read());     // read temperature
  *            ds1820.startConversion();     // start temperature conversion
  *            wait(1.0);                    // let DS1820 complete the temperature conversion
  *        }
  *    } else
- *        serial.printf("No DS1820 sensor found!\r\n");
+ *        printf("No DS1820 sensor found!\r\n");
  * }
  *
  * 
@@ -32,11 +32,7 @@
  
 #include "DS1820.h"
 
-#define DEBUG 0
-
-#if DEBUG
-extern Serial serial;
-#endif
+//#define DEBUG 1
 
 /**
  * @brief   Constructs a generic DS1820 sensor
@@ -83,7 +79,7 @@ bool DS1820::begin(void) {
     wait_ms(250);
     if(!oneWire.search(addr)) {
 #if DEBUG
-        serial.printf("No addresses.\r\n");
+        printf("No addresses.\r\n");
 #endif
         oneWire.reset_search();
         wait_ms(250);
@@ -91,11 +87,11 @@ bool DS1820::begin(void) {
     }
 
 #if DEBUG
-    serial.printf("ROM =");
+    printf("ROM =");
     for(uint8_t i = 0; i < 8; i++) {
-        serial.printf(" %x", addr[i]);
+        printf(" %x", addr[i]);
     }
-    serial.printf("\r\n");
+    printf("\r\n");
 #endif
 
     if(OneWire::crc8(addr, 7) == addr[7]) {
@@ -106,28 +102,28 @@ bool DS1820::begin(void) {
         case 0x10:
             model_s = true;
 #if DEBUG
-            serial.printf("DS18S20 or old DS1820\r\n");
+            printf("DS18S20 or old DS1820\r\n");
 #endif            
             break;
 
         case 0x28:
             model_s = false;
 #if DEBUG
-            serial.printf("DS18B20\r\n");
+            printf("DS18B20\r\n");
 #endif            
             break;
 
         case 0x22:
             model_s = false;
 #if DEBUG
-            serial.printf("DS1822\r\n");
+            printf("DS1822\r\n");
 #endif            
             break;
 
         default:
             present = false;
 #if DEBUG
-            serial.printf("Device doesn't belong to the DS1820 family\r\n");
+            printf("Device doesn't belong to the DS1820 family\r\n");
 #endif            
             return false;
         }
@@ -135,7 +131,7 @@ bool DS1820::begin(void) {
     }
     else {
 #if DEBUG    
-        serial.printf("Invalid CRC!\r\n");
+        printf("Invalid CRC!\r\n");
 #endif    
         return false;
     }
@@ -174,16 +170,16 @@ void DS1820::setResolution(uint8_t res) {
        
     oneWire.reset();
     oneWire.skip();
-    oneWire.write(0xBE);            // to read Scratchpad
+    oneWire.write_byte(0xBE);            // to read Scratchpad
     for(uint8_t i = 0; i < 9; i++)  // read Scratchpad bytes
-        data[i] = oneWire.read();   
+        data[i] = oneWire.read_byte();   
 
     data[4] |= (res - 9) << 5;      // update configuration byte (set resolution)  
     oneWire.reset();
     oneWire.skip();
-    oneWire.write(0x4E);            // to write into Scratchpad
+    oneWire.write_byte(0x4E);            // to write into Scratchpad
     for(uint8_t i = 2; i < 5; i++)  // write three bytes (2nd, 3rd, 4th) into Scratchpad
-        oneWire.write(data[i]);
+        oneWire.write_byte(data[i]);
 }
 
 /**
@@ -200,7 +196,7 @@ void DS1820::startConversion(void) {
     if(present) {
         oneWire.reset();
         oneWire.skip();
-        oneWire.write(0x44);    //start temperature conversion
+        oneWire.write_byte(0x44);    //start temperature conversion
     }
 }
 
@@ -214,15 +210,15 @@ float DS1820::read(void) {
     if(present) {
         oneWire.reset();
         oneWire.skip();
-        oneWire.write(0xBE);            // to read Scratchpad
-        for(uint8_t i = 0; i < 9; i++)  // read Scratchpad bytes
-            data[i] = oneWire.read();   
+        oneWire.write_byte(0xBE);           // to read Scratchpad
+        for(uint8_t i = 0; i < 9; i++)      // reading scratchpad registers
+            data[i] = oneWire.read_byte();
 
         // Convert the raw bytes to a 16-bit unsigned value
         uint16_t*   p_word = reinterpret_cast < uint16_t * > (&data[0]);
 
 #if DEBUG
-        serial.printf("raw = %#x\r\n", *p_word);
+        printf("raw = %#x\r\n", *p_word);
 #endif            
 
         if(model_s) {
@@ -276,18 +272,24 @@ uint8_t DS1820::read(float& temp) {
     if(present) {
         oneWire.reset();
         oneWire.skip();
-        oneWire.write(0xBE);            // to read Scratchpad
-        for(uint8_t i = 0; i < 9; i++)  // reading scratchpad registers
-            data[i] = oneWire.read();
+        oneWire.write_byte(0xBE);               // to read Scratchpad
+        for(uint8_t i = 0; i < 9; i++)          // reading scratchpad registers
+            data[i] = oneWire.read_byte();
 
         if(oneWire.crc8(data, 8) != data[8])    // if calculated CRC does not match the stored one
+        {
+#if DEBUG
+            for(uint8_t i = 0; i < 9; i++)
+                printf("data[%d]=0x%.2x\r\n", i, data[i]);
+#endif            
             return 2;                           // return with CRC error
+        }
 
         // Convert the raw bytes to a 16bit unsigned value
         uint16_t*   p_word = reinterpret_cast < uint16_t * > (&data[0]);
 
 #if DEBUG
-        serial.printf("raw = %#x\r\n", *p_word);
+        printf("raw = %#x\r\n", *p_word);
 #endif
 
         if(model_s) {
@@ -347,5 +349,4 @@ float DS1820::toFloat(uint16_t word) {
     else
         return (float(word) / 256.0f);
 }
-
 
