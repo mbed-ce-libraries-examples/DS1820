@@ -22,7 +22,7 @@
  *     if (ds1820.begin()) {
  *         while (1) {
  *             ds1820.startConversion();   // start temperature conversion from analog to digital
- *             wait(1.0);                  // let DS1820 complete the temperature conversion
+ *             ThisThread::sleep_for(1000);// let DS1820 complete the temperature conversion
  *             result = ds1820.read(temp); // read temperature from DS1820 and perform cyclic redundancy check (CRC)
  *             switch (result) {
  *                 case 0:                 // no errors -> 'temp' contains the value of measured temperature
@@ -86,7 +86,7 @@
  *         pc.printf("-------------------\r\n");
  *         for(i = 0; i < sensors_found; i++)
  *             ds1820[i]->startConversion();   // start temperature conversion from analog to digital       
- *         wait(1.0);                          // let DS1820s complete the temperature conversion
+ *         ThisThread::sleep_for(1000);        // let DS1820s complete the temperature conversion
  *         for(int i = 0; i < sensors_found; i++) {
  *             if(ds1820[i]->isPresent())
  *                 pc.printf("temp[%d] = %3.1f%cC\r\n", i, ds1820[i]->read(), 176);     // read temperature
@@ -146,7 +146,7 @@ bool DS1820::begin(void) {
         printf("No addresses.\r\n");
 #endif
         oneWire->reset_search();
-        wait_ms(250);
+        ThisThread::sleep_for(250);
         return false;
     }
     
