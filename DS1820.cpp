@@ -108,8 +108,8 @@ uint8_t DS1820::lastAddr[8] = {0, 0, 0, 0, 0, 0, 0, 0};
  * @param   pin: Name of data pin
  * @retval
  */
-DS1820::DS1820(PinName pin) {
-    oneWire = new OneWire(pin);
+DS1820::DS1820(PinName pin, int sample_point_us /* = 13 */) {
+    oneWire = new OneWire(pin, sample_point_us);
     present = false;
     model_s = false;
 }
