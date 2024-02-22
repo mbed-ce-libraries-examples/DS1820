@@ -165,10 +165,10 @@ bool DS1820::begin(void)
         printf("No addresses.\r\n");
 #endif
         _oneWire->reset_search();
-#if MBED_MAJOR_VERSION == 2
+#if MBED_MAJOR_VERSION < 6
         wait_ms(250);
 #else
-        ThisThread::sleep_for(250ms);
+        thread_sleep_for(250);
 #endif
         return false;
     }
